@@ -181,3 +181,10 @@ export async function getPublicGames(limitCount: number = 10): Promise<Game[]> {
 	const querySnapshot = await getDocs(q);
 	return querySnapshot.docs.map((doc) => doc.data() as Game);
 }
+
+export async function getCreatorGames(creatorId: string): Promise<Game[]> {
+	const gamesRef = collection(db, GAMES_COLLECTION);
+	const q = query(gamesRef, where("creatorId", "==", creatorId));
+	const querySnapshot = await getDocs(q);
+	return querySnapshot.docs.map((doc) => doc.data() as Game);
+}
