@@ -8,6 +8,7 @@ import {
 	getGameAnswers,
 	deleteGameAnswer,
 } from "@/services/game";
+import { useRouter } from "next/navigation";
 
 interface AttributeGuesserSetupProps {
 	game: Game;
@@ -37,6 +38,7 @@ export default function AttributeGuesserSetup({
 	const [success, setSuccess] = useState("");
 	const [answers, setAnswers] = useState<AttributeGameAnswer[]>([]);
 	const [loadingAnswers, setLoadingAnswers] = useState(true);
+	const router = useRouter();
 
 	useEffect(() => {
 		loadAnswers();
@@ -177,6 +179,25 @@ export default function AttributeGuesserSetup({
 				(_, index) => index !== indexToRemove
 			),
 		}));
+	};
+
+	const handleFinishSetup = async () => {
+		if (answers.length === 0) {
+			setError("Add at least one answer before publishing");
+			return;
+		}
+
+		try {
+			await updateGame(game.id, {
+				...game,
+				isPublished: true,
+				updatedAt: new Date().toISOString(),
+			});
+			router.push("/dashboard");
+		} catch (err) {
+			setError("Failed to publish game");
+			console.error(err);
+		}
 	};
 
 	return (
@@ -473,6 +494,21 @@ export default function AttributeGuesserSetup({
 						No answers added yet.
 					</p>
 				)}
+			</div>
+			{/* Finish Setup Section */}
+			<div className="bg-white p-6 rounded-lg shadow">
+				<h2 className="text-xl font-semibold mb-4">Finish Setup</h2>
+				<div className="space-y-4">
+					<p className="text-gray-600">
+						You have added {answers.length} answers to your game.
+					</p>
+					<button
+						onClick={handleFinishSetup}
+						className="w-full py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+					>
+						Publish Game
+					</button>
+				</div>
 			</div>
 		</div>
 	);

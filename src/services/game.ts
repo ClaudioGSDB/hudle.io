@@ -48,6 +48,7 @@ export async function createGame(
 			requiresLogin: gameData.settings?.requiresLogin || false,
 			...gameData.settings,
 		},
+		isPublished: false,
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
 		tags: gameData.tags || [],
@@ -172,7 +173,7 @@ export async function getPublicGames(limitCount: number = 10): Promise<Game[]> {
 	const gamesRef = collection(db, GAMES_COLLECTION);
 	const q = query(
 		gamesRef,
-		where("settings.isDailyChallenge", "==", true),
+		where("isPublished", "==", true),
 		orderBy("createdAt", "desc"),
 		firestoreLimit(limitCount)
 	);

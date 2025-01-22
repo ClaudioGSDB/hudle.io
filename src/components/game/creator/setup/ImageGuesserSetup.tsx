@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { Game, ImageGameAnswer } from "@/types/game";
 import {
 	updateGame,
-	addGameAnswer,
+	createGameAnswer,
 	getGameAnswers,
 	deleteGameAnswer,
 } from "@/services/game";
+
+import { useRouter } from "next/navigation";
 
 interface ImageGuesserSetupProps {
 	game: Game;
@@ -38,7 +40,7 @@ export default function ImageGuesserSetup({
 		try {
 			setLoadingAnswers(true);
 			const gameAnswers = await getGameAnswers(game.id);
-			setAnswers(gameAnswers);
+			setAnswers(gameAnswers as ImageGameAnswer[]);
 		} catch (err) {
 			setError("Failed to load answers");
 		} finally {
@@ -55,7 +57,7 @@ export default function ImageGuesserSetup({
 		try {
 			setError("");
 			const contentId = `content_${Date.now()}`;
-			const answerData: Partial<GameAnswer> = {
+			const answerData: Partial<ImageGameAnswer> = {
 				answer: currentAnswer.answer,
 				contents: {
 					[contentId]: {
@@ -64,10 +66,10 @@ export default function ImageGuesserSetup({
 				},
 			};
 
-			await addGameAnswer(game.id, answerData);
+			await createGameAnswer(game.id, "image_guesser", answerData);
 			await loadAnswers();
 
-			// Reset form and show success message
+			// Reset form
 			setCurrentAnswer({
 				answer: "",
 				contents: {},
@@ -75,7 +77,6 @@ export default function ImageGuesserSetup({
 			setImageUrl("");
 			setSuccess("Answer added successfully!");
 
-			// Clear success message after 3 seconds
 			setTimeout(() => {
 				setSuccess("");
 			}, 3000);
@@ -96,6 +97,27 @@ export default function ImageGuesserSetup({
 			} catch (err) {
 				setError("Failed to delete answer");
 			}
+		}
+	};
+
+	const router = useRouter();
+
+	const handleFinishSetup = async () => {
+		if (answers.length === 0) {
+			setError("Add at least one answer before publishing");
+			return;
+		}
+
+		try {
+			await updateGame(game.id, {
+				...game,
+				isPublished: true,
+				updatedAt: new Date().toISOString(),
+			});
+			router.push("/dashboard"); // Make sure this route exists
+		} catch (err) {
+			setError("Failed to publish game");
+			console.error(err);
 		}
 	};
 
@@ -142,7 +164,7 @@ export default function ImageGuesserSetup({
 						</label>
 						<input
 							type="text"
-							value={currentAnswer.answer as string}
+							value={currentAnswer.answer}
 							onChange={(e) =>
 								setCurrentAnswer((prev) => ({
 									...prev,
@@ -172,6 +194,7 @@ export default function ImageGuesserSetup({
 					{/* Submit Button */}
 					<button
 						onClick={handleAddAnswer}
+						type="button"
 						className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
 					>
 						Add Answer
@@ -202,6 +225,7 @@ export default function ImageGuesserSetup({
 										onClick={() =>
 											handleDeleteAnswer(answer.id)
 										}
+										type="button"
 										className="text-red-500 hover:text-red-700"
 									>
 										Delete
@@ -214,7 +238,7 @@ export default function ImageGuesserSetup({
 											<img
 												key={contentId}
 												src={content.value}
-												alt={answer.answer} // Now this is definitely a string
+												alt={answer.answer}
 												className="max-w-full h-auto rounded border border-gray-200"
 											/>
 										)
@@ -228,6 +252,21 @@ export default function ImageGuesserSetup({
 						No answers added yet.
 					</p>
 				)}
+			</div>
+			{/* Finish Setup Section */}
+			<div className="bg-white p-6 rounded-lg shadow">
+				<h2 className="text-xl font-semibold mb-4">Finish Setup</h2>
+				<div className="space-y-4">
+					<p className="text-gray-600">
+						You have added {answers.length} answers to your game.
+					</p>
+					<button
+						onClick={handleFinishSetup}
+						className="w-full py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+					>
+						Publish Game
+					</button>
+				</div>
 			</div>
 		</div>
 	);

@@ -51,6 +51,7 @@ export interface Game {
 	createdAt: string;
 	updatedAt: string;
 	tags: string[];
+	isPublished: boolean; // Add this line
 }
 
 // Base Game Answer
