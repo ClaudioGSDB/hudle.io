@@ -1,3 +1,4 @@
+//src/app/auth/signup/page.tsx
 "use client";
 
 import { SignUpForm } from "@/components/auth/AuthForms";

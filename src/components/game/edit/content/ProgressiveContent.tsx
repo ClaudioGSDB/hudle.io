@@ -1,3 +1,4 @@
+//src/components/game/edit/content/ProgressiveContent.tsx
 "use client";
 
 import { useState, useEffect } from "react";

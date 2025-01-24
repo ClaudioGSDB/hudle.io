@@ -1,3 +1,4 @@
+//src/app/play/[id]/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";

@@ -1,3 +1,4 @@
+//src/services/game.ts
 import {
 	collection,
 	doc,
@@ -187,4 +188,19 @@ export async function getCreatorGames(creatorId: string): Promise<Game[]> {
 	const q = query(gamesRef, where("creatorId", "==", creatorId));
 	const querySnapshot = await getDocs(q);
 	return querySnapshot.docs.map((doc) => doc.data() as Game);
+}
+
+export async function updateGameAnswer(
+	gameId: string,
+	answerId: string,
+	updates: Partial<GameAnswer>
+): Promise<void> {
+	const answerRef = doc(
+		db,
+		GAMES_COLLECTION,
+		gameId,
+		ANSWERS_COLLECTION,
+		answerId
+	);
+	await updateDoc(answerRef, updates);
 }

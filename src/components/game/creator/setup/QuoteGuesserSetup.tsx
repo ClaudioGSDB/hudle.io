@@ -1,3 +1,4 @@
+//src/components/game/creator/setup/QuoteGuesserSetup.tsx
 "use client";
 
 import { useState, useEffect } from "react";

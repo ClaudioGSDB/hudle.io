@@ -1,16 +1,11 @@
+//src/components/game/play/AttributeGuesserPlay.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Game, AttributeGameAnswer } from "@/types/game";
 import { getGameAnswers } from "@/services/game";
 
-interface AttributeGuesserPlayProps {
-	game: Game;
-}
-
-export default function AttributeGuesserPlay({
-	game,
-}: AttributeGuesserPlayProps) {
+export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	const [answers, setAnswers] = useState<AttributeGameAnswer[]>([]);
 	const [currentAnswer, setCurrentAnswer] =
 		useState<AttributeGameAnswer | null>(null);
@@ -19,147 +14,132 @@ export default function AttributeGuesserPlay({
 	const [attributeResults, setAttributeResults] = useState<
 		Record<string, boolean>
 	>({});
-	const [loading, setLoading] = useState(true);
-	const [won, setWon] = useState(false);
+	const [filteredAnswers, setFilteredAnswers] = useState<string[]>([]);
+	const [showDropdown, setShowDropdown] = useState(false);
+
+	const allPossibleAnswers = useMemo(
+		() => answers.map((a) => a.answer.toLowerCase()),
+		[answers]
+	);
 
 	useEffect(() => {
 		const loadAnswers = async () => {
-			try {
-				const gameAnswers = await getGameAnswers(game.id);
-				setAnswers(gameAnswers as AttributeGameAnswer[]);
-				setCurrentAnswer(gameAnswers[0] as AttributeGameAnswer);
-			} catch (err) {
-				console.error(err);
-			} finally {
-				setLoading(false);
-			}
+			const gameAnswers = await getGameAnswers(game.id);
+			setAnswers(gameAnswers as AttributeGameAnswer[]);
+			setCurrentAnswer(gameAnswers[0] as AttributeGameAnswer);
 		};
-
 		loadAnswers();
 	}, [game.id]);
 
-	const handleGuess = () => {
-		if (!guess.trim() || !currentAnswer) return;
+	useEffect(() => {
+		if (guess.trim()) {
+			const filtered = allPossibleAnswers
+				.filter((a) => a.includes(guess.toLowerCase()))
+				.filter((a) => !attempts.includes(a));
+			setFilteredAnswers(filtered);
+			setShowDropdown(true);
+		} else {
+			setFilteredAnswers([]);
+			setShowDropdown(false);
+		}
+	}, [guess, allPossibleAnswers, attempts]);
+
+	const handleGuess = (guessValue: string) => {
+		if (!currentAnswer || attempts.includes(guessValue)) return;
 
 		const isCorrect =
-			guess.toLowerCase() === currentAnswer.answer.toLowerCase();
-		setAttempts([...attempts, guess]);
+			guessValue.toLowerCase() === currentAnswer.answer.toLowerCase();
+		setAttempts((prev) => [...prev, guessValue]);
 		setGuess("");
+		setShowDropdown(false);
 
 		if (isCorrect) {
-			setWon(true);
+			setAttributeResults({});
 		} else {
-			// Check attributes for partial matches
-			const newAttributeResults = { ...attributeResults };
-			game.attributes?.forEach((attr) => {
-				const guessedAnswer = answers.find(
-					(a) => a.answer.toLowerCase() === guess.toLowerCase()
-				);
-				if (guessedAnswer) {
-					const isMatch =
+			const guessedAnswer = answers.find(
+				(a) => a.answer.toLowerCase() === guessValue.toLowerCase()
+			);
+
+			if (guessedAnswer) {
+				const newResults = { ...attributeResults };
+				game.attributes?.forEach((attr) => {
+					newResults[attr.id] =
 						JSON.stringify(
 							guessedAnswer.attributeValues[attr.id]
 						) ===
 						JSON.stringify(currentAnswer.attributeValues[attr.id]);
-					newAttributeResults[attr.id] = isMatch;
-				}
-			});
-			setAttributeResults(newAttributeResults);
+				});
+				setAttributeResults(newResults);
+			}
 		}
 	};
 
-	if (loading) return <div>Loading...</div>;
-	if (!currentAnswer || !game.attributes)
-		return <div>No game data available</div>;
+	const getAttributeClass = (attrId: string) => {
+		if (attributeResults[attrId] === undefined) return "bg-gray-100";
+		return attributeResults[attrId] ? "bg-green-100" : "bg-red-100";
+	};
+
+	if (!currentAnswer || !game.attributes) return null;
 
 	return (
 		<div className="max-w-2xl mx-auto p-4">
-			<h1 className="text-2xl font-bold mb-4">{game.title}</h1>
-
-			<div className="space-y-4">
-				{!won && (
-					<div className="flex gap-2">
-						<input
-							type="text"
-							value={guess}
-							onChange={(e) => setGuess(e.target.value)}
-							className="flex-1 px-4 py-2 border rounded"
-							placeholder="Enter your guess"
-							onKeyDown={(e) =>
-								e.key === "Enter" && handleGuess()
-							}
-						/>
-						<button
-							onClick={handleGuess}
-							className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-						>
-							Guess
-						</button>
-					</div>
-				)}
-
-				{won ? (
-					<div className="p-4 bg-green-100 rounded">
-						🎉 Correct! The answer was {currentAnswer.answer}!
-					</div>
-				) : (
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						{game.attributes.map((attr) => {
-							const lastGuess = answers.find(
-								(a) =>
-									a.answer.toLowerCase() ===
-									attempts[attempts.length - 1]?.toLowerCase()
-							);
-							const showValue =
-								lastGuess &&
-								attributeResults[attr.id] !== undefined;
-
-							return (
-								<div
-									key={attr.id}
-									className={`p-4 rounded ${
-										showValue
-											? attributeResults[attr.id]
-												? "bg-green-100"
-												: "bg-red-100"
-											: "bg-gray-100"
-									}`}
-								>
-									<div className="font-semibold">
-										{attr.name}
-									</div>
-									{showValue && (
-										<div className="mt-1">
-											{String(
-												lastGuess.attributeValues[
-													attr.id
-												]
-											)}
-										</div>
-									)}
-								</div>
-							);
-						})}
-					</div>
-				)}
-
-				<div>
-					<h3 className="font-semibold mb-2">Previous Guesses:</h3>
-					<div className="space-y-1">
-						{attempts.map((attempt, index) => (
+			<div className="relative">
+				<input
+					type="text"
+					value={guess}
+					onChange={(e) => setGuess(e.target.value)}
+					className="w-full px-4 py-2 border rounded"
+					placeholder="Enter your guess"
+				/>
+				{showDropdown && filteredAnswers.length > 0 && (
+					<div className="absolute w-full bg-white border rounded-b mt-1 max-h-60 overflow-y-auto z-10">
+						{filteredAnswers.map((answer) => (
 							<div
-								key={index}
-								className={`p-2 rounded ${
-									attempt.toLowerCase() ===
-									currentAnswer.answer.toLowerCase()
-										? "bg-green-100"
-										: "bg-gray-100"
-								}`}
+								key={answer}
+								className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+								onClick={() => handleGuess(answer)}
 							>
-								{attempt}
+								{answer}
 							</div>
 						))}
 					</div>
+				)}
+			</div>
+
+			<div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+				{game.attributes.map((attr) => (
+					<div
+						key={attr.id}
+						className={`p-4 rounded ${getAttributeClass(attr.id)}`}
+					>
+						<div className="font-semibold">{attr.name}</div>
+						{attributeResults[attr.id] !== undefined && (
+							<div className="mt-1">
+								{currentAnswer.attributeValues[
+									attr.id
+								]?.toString()}
+							</div>
+						)}
+					</div>
+				))}
+			</div>
+
+			<div className="mt-8">
+				<h3 className="font-semibold mb-2">Previous Guesses:</h3>
+				<div className="space-y-2">
+					{attempts.map((attempt, index) => (
+						<div
+							key={index}
+							className={`p-2 rounded ${
+								attempt.toLowerCase() ===
+								currentAnswer.answer.toLowerCase()
+									? "bg-green-100"
+									: "bg-gray-100"
+							}`}
+						>
+							{attempt}
+						</div>
+					))}
 				</div>
 			</div>
 		</div>

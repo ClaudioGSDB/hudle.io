@@ -1,3 +1,4 @@
+//src/components/game/edit/EditContent.tsx
 "use client";
 
 import { useState, useEffect } from "react";

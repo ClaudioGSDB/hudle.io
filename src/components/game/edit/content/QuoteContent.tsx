@@ -1,3 +1,4 @@
+//src/components/game/edit/content/QuoteContent.tsx
 "use client";
 
 import { useState, useEffect } from "react";

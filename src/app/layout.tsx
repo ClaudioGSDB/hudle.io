@@ -1,3 +1,4 @@
+//src/app/layout.tsx
 import { AuthProvider } from "@/context/AuthContext";
 import Header from "@/components/layout/Header";
 import "@/styles/globals.css";

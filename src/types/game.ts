@@ -1,3 +1,4 @@
+//src/types/game.ts
 // Basic types
 export type ContentType = "text" | "image" | "audio" | "attribute" | "video";
 export type GuessType = "exact" | "partial" | "contains" | "category";

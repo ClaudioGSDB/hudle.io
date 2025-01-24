@@ -1,3 +1,4 @@
+//src/components/game/play/ImageGuesserPlay.tsx
 "use client";
 
 import { useState, useEffect } from "react";

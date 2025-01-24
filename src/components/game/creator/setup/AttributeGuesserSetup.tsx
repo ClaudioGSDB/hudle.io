@@ -1,3 +1,4 @@
+//src/components/game/creator/setup/AttributeGuesserSetup.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,6 +8,7 @@ import {
 	createGameAnswer,
 	getGameAnswers,
 	deleteGameAnswer,
+	updateGameAnswer,
 } from "@/services/game";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +27,6 @@ export default function AttributeGuesserSetup({
 		answer: "",
 		attributeValues: {},
 	});
-
 	const [currentAttribute, setCurrentAttribute] = useState<
 		Partial<AttributeConfig>
 	>({
@@ -33,12 +34,20 @@ export default function AttributeGuesserSetup({
 		type: "text",
 		possibleValues: [],
 	});
-
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
 	const [answers, setAnswers] = useState<AttributeGameAnswer[]>([]);
 	const [loadingAnswers, setLoadingAnswers] = useState(true);
 	const router = useRouter();
+	const [editingAnswer, setEditingAnswer] = useState<string | null>(null);
+	const [editValues, setEditValues] = useState<{
+		answer: string;
+		attributeValues: Record<string, any>;
+	} | null>(null);
+	const [editingAttribute, setEditingAttribute] = useState<string | null>(
+		null
+	);
+	const [newValue, setNewValue] = useState("");
 
 	useEffect(() => {
 		loadAnswers();
@@ -97,14 +106,26 @@ export default function AttributeGuesserSetup({
 			return;
 		}
 
+		if (
+			answers.some(
+				(answer) =>
+					answer.answer.toLowerCase() ===
+					currentAnswer.answer?.toLowerCase()
+			)
+		) {
+			setError("An answer with this name already exists");
+			return;
+		}
+
 		if (!game.attributes?.length) {
 			setError("Add at least one attribute before adding answers");
 			return;
 		}
 
-		// Validate that all attributes have values
 		const missingAttributes = game.attributes.filter(
-			(attr) => !currentAnswer.attributeValues?.[attr.id]
+			(attr) =>
+				!currentAnswer.attributeValues ||
+				!currentAnswer.attributeValues[attr.id]
 		);
 
 		if (missingAttributes.length > 0) {
@@ -119,14 +140,11 @@ export default function AttributeGuesserSetup({
 		try {
 			await createGameAnswer(game.id, "attribute_guesser", currentAnswer);
 			await loadAnswers();
-
 			setCurrentAnswer({
 				answer: "",
 				attributeValues: {},
 			});
 			setError("");
-			setSuccess("Answer added successfully!");
-			setTimeout(() => setSuccess(""), 3000);
 		} catch (err) {
 			setError("Failed to add answer");
 		}
@@ -140,10 +158,26 @@ export default function AttributeGuesserSetup({
 					game.attributes?.filter((attr) => attr.id !== attrId) || [],
 			};
 
+			// Update all answers to remove the deleted attribute
+			const updatedAnswers = answers.map((answer) => {
+				const newAttributeValues = { ...answer.attributeValues };
+				delete newAttributeValues[attrId];
+				return { ...answer, attributeValues: newAttributeValues };
+			});
+
 			await updateGame(game.id, updatedGame);
+
+			// Update each answer in the database
+			await Promise.all(
+				updatedAnswers.map((answer) =>
+					updateGameAnswer(game.id, answer.id, {
+						attributeValues: answer.attributeValues,
+					})
+				)
+			);
+
 			setGame(updatedGame);
-			setSuccess("Attribute removed successfully!");
-			setTimeout(() => setSuccess(""), 3000);
+			await loadAnswers();
 		} catch (err) {
 			setError("Failed to remove attribute");
 		}
@@ -164,7 +198,7 @@ export default function AttributeGuesserSetup({
 
 	const handleAddPossibleValue = () => {
 		const value = prompt("Enter a possible value:");
-		if (value) {
+		if (value && !currentAttribute.possibleValues?.includes(value)) {
 			setCurrentAttribute((prev) => ({
 				...prev,
 				possibleValues: [...(prev.possibleValues || []), value],
@@ -179,6 +213,27 @@ export default function AttributeGuesserSetup({
 				(_, index) => index !== indexToRemove
 			),
 		}));
+	};
+
+	const handleEditAnswer = (answer: AttributeGameAnswer) => {
+		setEditingAnswer(answer.id);
+		setEditValues({
+			answer: answer.answer,
+			attributeValues: { ...answer.attributeValues },
+		});
+	};
+
+	const handleSaveEdit = async (answerId: string) => {
+		if (!editValues) return;
+
+		try {
+			await updateGameAnswer(game.id, answerId, editValues);
+			await loadAnswers();
+			setEditingAnswer(null);
+			setEditValues(null);
+		} catch (err) {
+			setError("Failed to update answer");
+		}
 	};
 
 	const handleFinishSetup = async () => {
@@ -200,9 +255,43 @@ export default function AttributeGuesserSetup({
 		}
 	};
 
+	// Add handler
+	const handleAddValueToAttribute = async (attrId: string, value: string) => {
+		if (!value.trim()) return;
+
+		const attr = game.attributes?.find((a) => a.id === attrId);
+		if (!attr || attr.possibleValues?.includes(value)) {
+			setError("Value already exists");
+			return;
+		}
+
+		try {
+			const updatedGame = {
+				...game,
+				attributes: game.attributes?.map((a) =>
+					a.id === attrId
+						? {
+								...a,
+								possibleValues: [
+									...(a.possibleValues || []),
+									value,
+								],
+						  }
+						: a
+				),
+			};
+
+			await updateGame(game.id, updatedGame);
+			setGame(updatedGame);
+			setNewValue("");
+			setEditingAttribute(null);
+		} catch (err) {
+			setError("Failed to add value");
+		}
+	};
+
 	return (
 		<div className="space-y-8">
-			{/* Attribute Configuration Section */}
 			<div className="bg-white p-6 rounded-lg shadow">
 				<h2 className="text-xl font-semibold mb-4">
 					Configure Attributes
@@ -289,7 +378,6 @@ export default function AttributeGuesserSetup({
 					{error && (
 						<div className="text-red-500 text-sm">{error}</div>
 					)}
-
 					{success && (
 						<div className="text-green-500 text-sm">{success}</div>
 					)}
@@ -303,7 +391,6 @@ export default function AttributeGuesserSetup({
 					</button>
 				</div>
 
-				{/* Current Attributes List */}
 				{game.attributes && game.attributes.length > 0 && (
 					<div className="mt-6">
 						<h3 className="text-lg font-medium mb-2">
@@ -313,35 +400,78 @@ export default function AttributeGuesserSetup({
 							{game.attributes.map((attr) => (
 								<div
 									key={attr.id}
-									className="flex justify-between items-center p-3 bg-gray-50 rounded"
+									className="p-3 bg-gray-50 rounded"
 								>
-									<div>
-										<span className="font-medium">
-											{attr.name}
-										</span>
-										<span className="ml-2 text-sm text-gray-500">
-											({attr.type})
-										</span>
-										{attr.possibleValues &&
-											attr.possibleValues.length > 0 && (
-												<span className="ml-2 text-sm text-gray-500">
-													[
-													{attr.possibleValues.join(
-														", "
-													)}
-													]
-												</span>
-											)}
+									<div className="flex justify-between items-start">
+										<div>
+											<span className="font-medium">
+												{attr.name}
+											</span>
+											<span className="ml-2 text-sm text-gray-500">
+												({attr.type})
+											</span>
+										</div>
+										{attr.type !== "boolean" && (
+											<button
+												onClick={() =>
+													setEditingAttribute(attr.id)
+												}
+												className="text-blue-500 hover:text-blue-700"
+											>
+												Add Value
+											</button>
+										)}
 									</div>
-									<button
-										type="button"
-										onClick={() =>
-											handleRemoveAttribute(attr.id)
-										}
-										className="text-red-500 hover:text-red-700"
-									>
-										Remove
-									</button>
+
+									{editingAttribute === attr.id && (
+										<div className="mt-2 flex gap-2">
+											<input
+												type="text"
+												value={newValue}
+												onChange={(e) =>
+													setNewValue(e.target.value)
+												}
+												className="flex-1 px-2 py-1 border rounded"
+												placeholder="New value"
+											/>
+											<button
+												onClick={() =>
+													handleAddValueToAttribute(
+														attr.id,
+														newValue
+													)
+												}
+												className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+											>
+												Add
+											</button>
+											<button
+												onClick={() => {
+													setEditingAttribute(null);
+													setNewValue("");
+												}}
+												className="px-3 py-1 border rounded hover:bg-gray-50"
+											>
+												Cancel
+											</button>
+										</div>
+									)}
+
+									{attr.possibleValues &&
+										attr.possibleValues.length > 0 && (
+											<div className="mt-2 flex flex-wrap gap-1">
+												{attr.possibleValues.map(
+													(value) => (
+														<span
+															key={value}
+															className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+														>
+															{value}
+														</span>
+													)
+												)}
+											</div>
+										)}
 								</div>
 							))}
 						</div>
@@ -349,7 +479,6 @@ export default function AttributeGuesserSetup({
 				)}
 			</div>
 
-			{/* Answer Configuration Section */}
 			{game.attributes && game.attributes.length > 0 && (
 				<div className="bg-white p-6 rounded-lg shadow">
 					<h2 className="text-xl font-semibold mb-4">Add Answers</h2>
@@ -380,11 +509,11 @@ export default function AttributeGuesserSetup({
 								</label>
 								{attr.type === "boolean" ? (
 									<select
-										value={
+										value={String(
 											currentAnswer.attributeValues?.[
 												attr.id
-											] as string
-										}
+											] ?? ""
+										)}
 										onChange={(e) =>
 											setCurrentAnswer((prev) => ({
 												...prev,
@@ -404,11 +533,11 @@ export default function AttributeGuesserSetup({
 									</select>
 								) : (
 									<select
-										value={
+										value={String(
 											currentAnswer.attributeValues?.[
 												attr.id
-											] as string
-										}
+											] ?? ""
+										)}
 										onChange={(e) =>
 											setCurrentAnswer((prev) => ({
 												...prev,
@@ -442,47 +571,175 @@ export default function AttributeGuesserSetup({
 				</div>
 			)}
 
-			{/* Answers List Section */}
 			<div className="bg-white p-6 rounded-lg shadow">
 				<h2 className="text-xl font-semibold mb-4">Current Answers</h2>
 
 				{loadingAnswers ? (
 					<div className="flex justify-center py-4">
-						<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+						<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
 					</div>
 				) : answers.length > 0 ? (
 					<div className="space-y-4">
 						{answers.map((answer) => (
 							<div
 								key={answer.id}
-								className="border rounded-lg p-4 hover:bg-gray-50"
+								className="border rounded-lg p-4"
 							>
-								<div className="flex justify-between items-start mb-2">
-									<h3 className="font-medium text-lg">
-										{answer.answer}
-									</h3>
-									<button
-										type="button"
-										onClick={() =>
-											handleDeleteAnswer(answer.id)
-										}
-										className="text-red-500 hover:text-red-700"
-									>
-										Delete
-									</button>
+								<div className="flex justify-between items-start">
+									{editingAnswer === answer.id ? (
+										<input
+											type="text"
+											value={editValues?.answer}
+											onChange={(e) =>
+												setEditValues((prev) => ({
+													...prev!,
+													answer: e.target.value,
+												}))
+											}
+											className="font-medium px-2 py-1 border rounded"
+										/>
+									) : (
+										<h4 className="font-medium">
+											{answer.answer}
+										</h4>
+									)}
+									<div className="flex gap-2">
+										{editingAnswer === answer.id ? (
+											<>
+												<button
+													onClick={() =>
+														handleSaveEdit(
+															answer.id
+														)
+													}
+													className="text-green-500 hover:text-green-700"
+												>
+													Save
+												</button>
+												<button
+													onClick={() => {
+														setEditingAnswer(null);
+														setEditValues(null);
+													}}
+													className="text-gray-500 hover:text-gray-700"
+												>
+													Cancel
+												</button>
+											</>
+										) : (
+											<>
+												<button
+													onClick={() =>
+														handleEditAnswer(answer)
+													}
+													className="text-blue-500 hover:text-blue-700"
+												>
+													Edit
+												</button>
+												<button
+													onClick={() =>
+														handleDeleteAnswer(
+															answer.id
+														)
+													}
+													className="text-red-500 hover:text-red-700"
+												>
+													Delete
+												</button>
+											</>
+										)}
+									</div>
 								</div>
-
-								<div className="grid grid-cols-2 gap-2">
+								<div className="mt-2 grid grid-cols-2 gap-2">
 									{game.attributes?.map((attr) => (
 										<div key={attr.id} className="text-sm">
 											<span className="text-gray-600">
 												{attr.name}:{" "}
 											</span>
-											<span className="font-medium">
-												{answer.attributeValues[
-													attr.id
-												]?.toString()}
-											</span>
+											{editingAnswer === answer.id ? (
+												attr.type === "boolean" ? (
+													<select
+														value={String(
+															editValues
+																?.attributeValues[
+																attr.id
+															]
+														)}
+														onChange={(e) =>
+															setEditValues(
+																(prev) => ({
+																	...prev!,
+																	attributeValues:
+																		{
+																			...prev!
+																				.attributeValues,
+																			[attr.id]:
+																				e
+																					.target
+																					.value ===
+																				"true",
+																		},
+																})
+															)
+														}
+														className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+													>
+														<option value="true">
+															Yes
+														</option>
+														<option value="false">
+															No
+														</option>
+													</select>
+												) : (
+													<select
+														value={String(
+															editValues
+																?.attributeValues[
+																attr.id
+															]
+														)}
+														onChange={(e) =>
+															setEditValues(
+																(prev) => ({
+																	...prev!,
+																	attributeValues:
+																		{
+																			...prev!
+																				.attributeValues,
+																			[attr.id]:
+																				e
+																					.target
+																					.value,
+																		},
+																})
+															)
+														}
+														className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+													>
+														{attr.possibleValues?.map(
+															(value) => (
+																<option
+																	key={value}
+																	value={
+																		value
+																	}
+																>
+																	{value}
+																</option>
+															)
+														)}
+													</select>
+												)
+											) : (
+												<span>
+													{String(
+														answer.attributeValues[
+															attr.id
+														]
+													)}
+												</span>
+											)}
 										</div>
 									))}
 								</div>
@@ -495,7 +752,7 @@ export default function AttributeGuesserSetup({
 					</p>
 				)}
 			</div>
-			{/* Finish Setup Section */}
+
 			<div className="bg-white p-6 rounded-lg shadow">
 				<h2 className="text-xl font-semibold mb-4">Finish Setup</h2>
 				<div className="space-y-4">
