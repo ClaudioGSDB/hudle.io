@@ -6,26 +6,54 @@ import { useAuth } from "@/context/AuthContext";
 import { getPublicGames } from "@/services/game";
 import { Game } from "@/types/game";
 import Link from "next/link";
+import SearchBar from "@/components/home/SearchBar";
+import CategoryFilter from "@/components/home/CategoryFilter";
+import GameGrid from "@/components/home/GameGrid";
 
 export default function HomePage() {
 	const { user } = useAuth();
 	const [games, setGames] = useState<Game[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [selectedCategory, setSelectedCategory] = useState<string | null>(
+		null
+	);
 
 	useEffect(() => {
-		async function loadGames() {
-			try {
-				const publicGames = await getPublicGames(10);
-				setGames(publicGames);
-			} catch (error) {
-				console.error("Error loading games:", error);
-			} finally {
-				setLoading(false);
-			}
-		}
-
 		loadGames();
 	}, []);
+
+	const loadGames = async () => {
+		try {
+			const publicGames = await getPublicGames(20);
+			setGames(publicGames);
+		} catch (error) {
+			console.error("Error loading games:", error);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const filteredGames = games.filter((game) => {
+		const matchesSearch =
+			searchQuery.trim() === "" ||
+			game.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			game.description
+				.toLowerCase()
+				.includes(searchQuery.toLowerCase()) ||
+			game.tags.some((tag) =>
+				tag.toLowerCase().includes(searchQuery.toLowerCase())
+			);
+
+		const matchesCategory =
+			!selectedCategory || game.tags.includes(selectedCategory);
+
+		return matchesSearch && matchesCategory;
+	});
+
+	const featuredGames = games.filter(
+		(game) => game.settings.isDailyChallenge
+	);
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -56,55 +84,46 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			{/* Games Grid */}
-			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-				<h2 className="text-2xl font-bold mb-6">Featured Games</h2>
-
-				{loading ? (
-					<div className="flex justify-center items-center min-h-[200px]">
-						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+			{/* Search and Filter Section */}
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div className="flex flex-col md:flex-row gap-4 mb-8">
+					<div className="flex-1">
+						<SearchBar
+							value={searchQuery}
+							onChange={setSearchQuery}
+						/>
 					</div>
-				) : games.length > 0 ? (
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-						{games.map((game) => (
-							<Link
-								key={game.id}
-								href={`/play/${game.id}`}
-								className="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
-							>
-								<div className="p-6">
-									<h3 className="text-xl font-semibold mb-2">
-										{game.title}
-									</h3>
-									<p className="text-gray-600 mb-4">
-										{game.description}
-									</p>
+					<CategoryFilter
+						selected={selectedCategory}
+						onSelect={setSelectedCategory}
+					/>
+				</div>
 
-									<div className="flex flex-wrap gap-2">
-										{game.tags.map((tag, index) => (
-											<span
-												key={index}
-												className="px-2 py-1 bg-gray-100 text-gray-600 text-sm rounded"
-											>
-												{tag}
-											</span>
-										))}
-									</div>
-
-									{game.settings.isDailyChallenge && (
-										<div className="mt-4 text-green-600 text-sm">
-											Daily Challenge Available!
-										</div>
-									)}
-								</div>
-							</Link>
-						))}
-					</div>
-				) : (
-					<div className="text-center text-gray-500 py-12">
-						No games available yet. Be the first to create one!
+				{/* Featured Games */}
+				{featuredGames.length > 0 && (
+					<div className="mb-12">
+						<h2 className="text-2xl font-bold mb-6">
+							Daily Challenges
+						</h2>
+						<GameGrid games={featuredGames} />
 					</div>
 				)}
+
+				{/* All Games */}
+				<div>
+					<h2 className="text-2xl font-bold mb-6">Browse Games</h2>
+					{loading ? (
+						<div className="flex justify-center items-center min-h-[200px]">
+							<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+						</div>
+					) : filteredGames.length > 0 ? (
+						<GameGrid games={filteredGames} />
+					) : (
+						<div className="text-center text-gray-500 py-12">
+							No games found matching your criteria
+						</div>
+					)}
+				</div>
 			</div>
 		</div>
 	);
