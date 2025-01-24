@@ -22,28 +22,39 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	const [showDropdown, setShowDropdown] = useState(false);
 	const [gameComplete, setGameComplete] = useState(false);
 	const [stats, setStats] = useState<any>(null);
+	const [answers, setAnswers] = useState<AttributeGameAnswer[]>([]);
 
 	const allPossibleAnswers = useMemo(() => {
-		if (!currentAnswer) return [];
-		return [currentAnswer.answer.toLowerCase()];
-	}, [currentAnswer]);
+		try {
+			return answers.map((a) => a.answer.toLowerCase());
+		} catch (error) {
+			console.error("Error getting possible answers:", error);
+			return [];
+		}
+	}, [answers]);
 
 	useEffect(() => {
 		loadGame();
 	}, [game.id]);
 
 	const loadGame = async () => {
-		if (game.settings.isDailyChallenge) {
-			const dailyAnswer = await getDailyAnswer(game.id);
-			setCurrentAnswer(dailyAnswer as AttributeGameAnswer);
-
-			if (user) {
-				const userStats = await getDailyStats(user.uid, game.id);
-				setStats(userStats);
-			}
-		} else {
+		try {
 			const gameAnswers = await getGameAnswers(game.id);
-			setCurrentAnswer(gameAnswers[0] as AttributeGameAnswer);
+			setAnswers(gameAnswers as AttributeGameAnswer[]);
+
+			if (game.settings.isDailyChallenge) {
+				const dailyAnswer = await getDailyAnswer(game.id);
+				setCurrentAnswer(dailyAnswer as AttributeGameAnswer);
+
+				if (user) {
+					const userStats = await getDailyStats(user.uid, game.id);
+					setStats(userStats);
+				}
+			} else {
+				setCurrentAnswer(gameAnswers[0] as AttributeGameAnswer);
+			}
+		} catch (error) {
+			console.error("Error loading game:", error);
 		}
 	};
 
@@ -96,11 +107,6 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 		}
 	};
 
-	const getAttributeClass = (attrId: string) => {
-		if (attributeResults[attrId] === undefined) return "bg-gray-100";
-		return attributeResults[attrId] ? "bg-green-100" : "bg-red-100";
-	};
-
 	if (!currentAnswer || !game.attributes) return null;
 
 	return (
@@ -116,6 +122,11 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 					</div>
 				</div>
 			)}
+
+			<div className="text-center mb-8">
+				<h1 className="text-2xl font-bold mb-2">{game.title}</h1>
+				<p className="text-gray-600">{game.description}</p>
+			</div>
 
 			<div className="relative">
 				<input
@@ -141,40 +152,71 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 				)}
 			</div>
 
-			<div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-				{game.attributes.map((attr) => (
-					<div
-						key={attr.id}
-						className={`p-4 rounded ${getAttributeClass(attr.id)}`}
-					>
-						<div className="font-semibold">{attr.name}</div>
-						{attributeResults[attr.id] !== undefined && (
-							<div className="mt-1">
-								{currentAnswer.attributeValues[
-									attr.id
-								]?.toString()}
-							</div>
-						)}
-					</div>
-				))}
-			</div>
-
 			<div className="mt-8">
-				<h3 className="font-semibold mb-2">Previous Guesses:</h3>
+				<h3 className="font-semibold mb-4">Previous Guesses:</h3>
+				<div className="flex mb-2">
+					<div className="w-24"></div>
+					<div className="flex-1 flex space-x-1">
+						{game.attributes?.map((attr) => (
+							<div
+								key={attr.id}
+								className="flex-1 text-sm text-center font-semibold"
+							>
+								{attr.name}
+							</div>
+						))}
+					</div>
+				</div>
 				<div className="space-y-2">
-					{attempts.map((attempt, index) => (
-						<div
-							key={index}
-							className={`p-2 rounded ${
-								attempt.toLowerCase() ===
-								currentAnswer.answer.toLowerCase()
-									? "bg-green-100"
-									: "bg-gray-100"
-							}`}
-						>
-							{attempt}
-						</div>
-					))}
+					{attempts.map((attempt, index) => {
+						const isCorrect =
+							attempt.toLowerCase() ===
+							currentAnswer.answer.toLowerCase();
+						const guessAnswer = answers.find(
+							(a) =>
+								a.answer.toLowerCase() === attempt.toLowerCase()
+						);
+
+						return (
+							<div
+								key={index}
+								className="flex items-center space-x-2"
+							>
+								<div className="w-24 font-medium">
+									{attempt}
+								</div>
+								<div className="flex-1 flex space-x-1">
+									{game.attributes?.map((attr) => {
+										const guessValue =
+											guessAnswer?.attributeValues[
+												attr.id
+											];
+										const correctValue =
+											currentAnswer.attributeValues[
+												attr.id
+											];
+										const isAttrCorrect =
+											JSON.stringify(guessValue) ===
+											JSON.stringify(correctValue);
+
+										return (
+											<div
+												key={attr.id}
+												className={`flex-1 text-sm text-center p-2 rounded ${
+													isAttrCorrect
+														? "bg-green-600 text-white"
+														: "bg-red-600 text-white"
+												}`}
+												title={attr.name}
+											>
+												{String(guessValue)}
+											</div>
+										);
+									})}
+								</div>
+							</div>
+						);
+					})}
 				</div>
 			</div>
 
