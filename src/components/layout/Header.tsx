@@ -4,10 +4,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
 
 export default function Header() {
 	const { user, logout } = useAuth();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
 	const handleLogout = async () => {
 		try {
@@ -51,12 +53,60 @@ export default function Header() {
 								>
 									Create Game
 								</Link>
-								<button
-									onClick={handleLogout}
-									className="text-gray-500 hover:text-gray-900"
-								>
-									Sign Out
-								</button>
+								<div className="relative">
+									<button
+										onClick={() =>
+											setIsAccountMenuOpen(
+												!isAccountMenuOpen
+											)
+										}
+										className="flex items-center text-gray-500 hover:text-gray-900"
+									>
+										Account
+										<ChevronDownIcon className="h-5 w-5 ml-1" />
+									</button>
+
+									{isAccountMenuOpen && (
+										<div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border">
+											<Link
+												href="/dashboard"
+												className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+												onClick={() =>
+													setIsAccountMenuOpen(false)
+												}
+											>
+												Dashboard
+											</Link>
+											<Link
+												href="/profile"
+												className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+												onClick={() =>
+													setIsAccountMenuOpen(false)
+												}
+											>
+												Profile
+											</Link>
+											<Link
+												href="/settings"
+												className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+												onClick={() =>
+													setIsAccountMenuOpen(false)
+												}
+											>
+												Settings
+											</Link>
+											<button
+												onClick={() => {
+													setIsAccountMenuOpen(false);
+													handleLogout();
+												}}
+												className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+											>
+												Sign Out
+											</button>
+										</div>
+									)}
+								</div>
 							</>
 						) : (
 							<>
@@ -137,6 +187,27 @@ export default function Header() {
 										onClick={() => setIsMenuOpen(false)}
 									>
 										Create Game
+									</Link>
+									<Link
+										href="/dashboard"
+										className="text-gray-500 hover:text-gray-900"
+										onClick={() => setIsMenuOpen(false)}
+									>
+										Dashboard
+									</Link>
+									<Link
+										href="/profile"
+										className="text-gray-500 hover:text-gray-900"
+										onClick={() => setIsMenuOpen(false)}
+									>
+										Profile
+									</Link>
+									<Link
+										href="/settings"
+										className="text-gray-500 hover:text-gray-900"
+										onClick={() => setIsMenuOpen(false)}
+									>
+										Settings
 									</Link>
 									<button
 										onClick={() => {
