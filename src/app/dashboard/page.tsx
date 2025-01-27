@@ -5,7 +5,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Game } from "@/types/game";
 import Link from "next/link";
-import { getCreatorGames } from "@/services/game";
+import { getCreatorGames, deleteGame } from "@/services/game";
+import { TrashIcon } from "@heroicons/react/24/outline";
 
 export default function DashboardPage() {
 	const { user } = useAuth();
@@ -36,6 +37,23 @@ export default function DashboardPage() {
 			</div>
 		);
 	}
+
+	const handleDeleteGame = async (gameId: string) => {
+		if (
+			!window.confirm(
+				"Are you sure you want to delete this game? This action cannot be undone."
+			)
+		) {
+			return;
+		}
+
+		try {
+			await deleteGame(gameId);
+			setGames(games.filter((game) => game.id !== gameId));
+		} catch (err) {
+			setError("Failed to delete game");
+		}
+	};
 
 	return (
 		<div className="min-h-screen bg-gray-50 py-8">
@@ -97,7 +115,7 @@ export default function DashboardPage() {
 								))}
 							</div>
 
-							<div className="mt-6 flex gap-3">
+							<div className="mt-6 flex gap-2">
 								{game.isPublished ? (
 									<Link
 										href={`/play/${game.id}`}
@@ -119,6 +137,12 @@ export default function DashboardPage() {
 								>
 									Edit
 								</Link>
+								<button
+									onClick={() => handleDeleteGame(game.id)}
+									className="p-2 text-red-600 hover:bg-red-50 rounded"
+								>
+									<TrashIcon className="h-5 w-5" />
+								</button>
 							</div>
 						</div>
 					))}

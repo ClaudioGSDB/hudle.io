@@ -78,7 +78,7 @@ export default function Header() {
 												Dashboard
 											</Link>
 											<Link
-												href="/profile"
+												href="/dashboard/profile"
 												className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
 												onClick={() =>
 													setIsAccountMenuOpen(false)
@@ -87,7 +87,7 @@ export default function Header() {
 												Profile
 											</Link>
 											<Link
-												href="/settings"
+												href="/dashboard/settings"
 												className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
 												onClick={() =>
 													setIsAccountMenuOpen(false)
@@ -196,14 +196,14 @@ export default function Header() {
 										Dashboard
 									</Link>
 									<Link
-										href="/profile"
+										href="/dashboard/profile"
 										className="text-gray-500 hover:text-gray-900"
 										onClick={() => setIsMenuOpen(false)}
 									>
 										Profile
 									</Link>
 									<Link
-										href="/settings"
+										href="/dashboard/settings"
 										className="text-gray-500 hover:text-gray-900"
 										onClick={() => setIsMenuOpen(false)}
 									>

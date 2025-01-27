@@ -190,6 +190,11 @@ export async function getCreatorGames(creatorId: string): Promise<Game[]> {
 	return querySnapshot.docs.map((doc) => doc.data() as Game);
 }
 
+export async function deleteGame(gameId: string): Promise<void> {
+	const gameRef = doc(db, GAMES_COLLECTION, gameId);
+	await deleteDoc(gameRef);
+}
+
 export async function updateGameAnswer(
 	gameId: string,
 	answerId: string,

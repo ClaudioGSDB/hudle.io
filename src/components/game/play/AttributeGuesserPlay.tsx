@@ -5,9 +5,11 @@ import { useState, useEffect, useMemo } from "react";
 import { Game, AttributeGameAnswer } from "@/types/game";
 import { useAuth } from "@/context/AuthContext";
 import { getGameAnswers } from "@/services/game";
+import { recordGameStart, recordGameEnd } from "@/services/gamesPlayed";
 import { getDailyAnswer } from "@/services/dailyChallenge";
 import { updateDailyStats, getDailyStats } from "@/services/dailyStats";
 import ShareResults from "@/components/game/ShareResults";
+import GameStats from "@/components/game/stats/GameStats";
 
 export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	const { user } = useAuth();
@@ -22,6 +24,7 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	const [showDropdown, setShowDropdown] = useState(false);
 	const [gameComplete, setGameComplete] = useState(false);
 	const [stats, setStats] = useState<any>(null);
+	const [playId, setPlayId] = useState<string | null>(null);
 	const [answers, setAnswers] = useState<AttributeGameAnswer[]>([]);
 
 	const allPossibleAnswers = useMemo(() => {
@@ -35,6 +38,9 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 
 	useEffect(() => {
 		loadGame();
+		if (user) {
+			recordGameStart(user.uid, game.id).then(setPlayId);
+		}
 	}, [game.id]);
 
 	const loadGame = async () => {
@@ -83,6 +89,16 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 		if (isCorrect) {
 			setAttributeResults({});
 			setGameComplete(true);
+			if (playId) {
+				recordGameEnd(playId, {
+					attempts: attempts.length + 1,
+					won: true,
+					timeSpent: Math.floor(
+						(Date.now() - new Date(game.createdAt).getTime()) / 1000
+					),
+					guesses: [...attempts, guessValue],
+				});
+			}
 			if (user && game.settings.isDailyChallenge) {
 				const updatedStats = await updateDailyStats(
 					user.uid,
@@ -125,7 +141,8 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 
 			<div className="text-center mb-8">
 				<h1 className="text-2xl font-bold mb-2">{game.title}</h1>
-				<p className="text-gray-600">{game.description}</p>
+				<p className="text-gray-600 mb-6">{game.description}</p>
+				<GameStats gameId={game.id} />
 			</div>
 
 			<div className="relative">
