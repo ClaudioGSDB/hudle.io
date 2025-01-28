@@ -21,12 +21,6 @@ export default function GameGrid({ games }: GameGridProps) {
 							<h3 className="text-xl font-semibold text-gray-900">
 								{game.title}
 							</h3>
-							{game.settings.isDailyChallenge && (
-								<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-									<CalendarIcon className="h-4 w-4 mr-1" />
-									Daily
-								</span>
-							)}
 						</div>
 
 						<p className="mt-2 text-gray-600 line-clamp-2">

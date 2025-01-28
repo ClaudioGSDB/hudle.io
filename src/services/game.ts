@@ -43,7 +43,6 @@ export async function createGame(
 		contents: gameData.contents || [],
 		attributes: gameData.attributes || [],
 		settings: {
-			isDailyChallenge: gameData.settings?.isDailyChallenge || false,
 			allowSkip: gameData.settings?.allowSkip || false,
 			showProgress: gameData.settings?.showProgress || true,
 			requiresLogin: gameData.settings?.requiresLogin || false,
