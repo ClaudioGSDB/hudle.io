@@ -51,10 +51,6 @@ export default function HomePage() {
 		return matchesSearch && matchesCategory;
 	});
 
-	const featuredGames = games.filter(
-		(game) => game.settings.isDailyChallenge
-	);
-
 	return (
 		<div className="min-h-screen bg-gray-50">
 			{/* Hero Section */}
@@ -98,16 +94,6 @@ export default function HomePage() {
 						onSelect={setSelectedCategory}
 					/>
 				</div>
-
-				{/* Featured Games */}
-				{featuredGames.length > 0 && (
-					<div className="mb-12">
-						<h2 className="text-2xl font-bold mb-6">
-							Daily Challenges
-						</h2>
-						<GameGrid games={featuredGames} />
-					</div>
-				)}
 
 				{/* All Games */}
 				<div>
