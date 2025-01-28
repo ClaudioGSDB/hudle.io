@@ -10,6 +10,11 @@ import { getDailyAnswer } from "@/services/dailyChallenge";
 import { updateDailyStats, getDailyStats } from "@/services/dailyStats";
 import ShareResults from "@/components/game/ShareResults";
 import GameStats from "@/components/game/stats/GameStats";
+import {
+	getGameSession,
+	saveGameSession,
+	createNewSession,
+} from "@/services/gameSession";
 
 export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	const { user } = useAuth();
@@ -24,8 +29,9 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	const [showDropdown, setShowDropdown] = useState(false);
 	const [gameComplete, setGameComplete] = useState(false);
 	const [stats, setStats] = useState<any>(null);
-	const [playId, setPlayId] = useState<string | null>(null);
 	const [answers, setAnswers] = useState<AttributeGameAnswer[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [playId, setPlayId] = useState<string | null>(null);
 
 	const allPossibleAnswers = useMemo(() => {
 		try {
@@ -37,32 +43,59 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	}, [answers]);
 
 	useEffect(() => {
-		loadGame();
-		if (user) {
-			recordGameStart(user.uid, game.id).then(setPlayId);
-		}
-	}, [game.id]);
-
-	const loadGame = async () => {
-		try {
-			const gameAnswers = await getGameAnswers(game.id);
-			setAnswers(gameAnswers as AttributeGameAnswer[]);
-
-			if (game.settings.isDailyChallenge) {
-				const dailyAnswer = await getDailyAnswer(game.id);
-				setCurrentAnswer(dailyAnswer as AttributeGameAnswer);
+		const loadGame = async () => {
+			try {
+				// Load game answers
+				const gameAnswers = await getGameAnswers(game.id);
+				setAnswers(gameAnswers as AttributeGameAnswer[]);
 
 				if (user) {
-					const userStats = await getDailyStats(user.uid, game.id);
-					setStats(userStats);
+					recordGameStart(user.uid, game.id).then(setPlayId);
 				}
-			} else {
-				setCurrentAnswer(gameAnswers[0] as AttributeGameAnswer);
+
+				// Check for existing session
+				const session = await getGameSession(game.id, user?.uid);
+
+				if (session) {
+					setAttempts(session.attempts);
+					setAttributeResults(session.attributeResults);
+					setGameComplete(session.isComplete);
+
+					if (session.isComplete) {
+						const answerId = game.settings.isDailyChallenge
+							? await getDailyAnswer(game.id)
+							: gameAnswers[0];
+						setCurrentAnswer(answerId as AttributeGameAnswer);
+					}
+				} else {
+					// Create new session
+					const newSession = createNewSession(game.id, user?.uid);
+					await saveGameSession(newSession, user?.uid);
+				}
+
+				if (game.settings.isDailyChallenge) {
+					const dailyAnswer = await getDailyAnswer(game.id);
+					setCurrentAnswer(dailyAnswer as AttributeGameAnswer);
+
+					if (user) {
+						const userStats = await getDailyStats(
+							user.uid,
+							game.id
+						);
+						setStats(userStats);
+					}
+				} else {
+					setCurrentAnswer(gameAnswers[0] as AttributeGameAnswer);
+				}
+			} catch (error) {
+				console.error("Error loading game:", error);
+			} finally {
+				setLoading(false);
 			}
-		} catch (error) {
-			console.error("Error loading game:", error);
-		}
-	};
+		};
+
+		loadGame();
+	}, [game.id, user]);
 
 	useEffect(() => {
 		if (guess.trim()) {
@@ -78,27 +111,44 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	}, [guess, allPossibleAnswers, attempts]);
 
 	const handleGuess = async (guessValue: string) => {
-		if (!currentAnswer || attempts.includes(guessValue)) return;
+		if (!currentAnswer || attempts.includes(guessValue) || gameComplete)
+			return;
 
 		const isCorrect =
 			guessValue.toLowerCase() === currentAnswer.answer.toLowerCase();
-		setAttempts((prev) => [...prev, guessValue]);
+		const newAttempts = [...attempts, guessValue];
+		setAttempts(newAttempts);
 		setGuess("");
 		setShowDropdown(false);
 
 		if (isCorrect) {
 			setAttributeResults({});
 			setGameComplete(true);
+
+			// Save completed session
+			const session = {
+				userId: user?.uid,
+				gameId: game.id,
+				date: new Date().toISOString().split("T")[0],
+				attempts: newAttempts,
+				attributeResults,
+				startedAt: new Date().toISOString(),
+				completedAt: new Date().toISOString(),
+				isComplete: true,
+			};
+			await saveGameSession(session, user?.uid);
+
 			if (playId) {
-				recordGameEnd(playId, {
-					attempts: attempts.length + 1,
+				await recordGameEnd(playId, {
+					attempts: newAttempts.length,
 					won: true,
 					timeSpent: Math.floor(
 						(Date.now() - new Date(game.createdAt).getTime()) / 1000
 					),
-					guesses: [...attempts, guessValue],
+					guesses: newAttempts,
 				});
 			}
+
 			if (user && game.settings.isDailyChallenge) {
 				const updatedStats = await updateDailyStats(
 					user.uid,
@@ -109,19 +159,40 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 				setStats(updatedStats);
 			}
 		} else {
-			const guessedAnswer = {
-				answer: guessValue,
-				attributeValues: currentAnswer.attributeValues,
-			};
+			const guessedAnswer = answers.find(
+				(a) => a.answer.toLowerCase() === guessValue.toLowerCase()
+			);
 			const newResults = { ...attributeResults };
+
 			game.attributes?.forEach((attr) => {
 				newResults[attr.id] =
-					JSON.stringify(guessedAnswer.attributeValues[attr.id]) ===
+					JSON.stringify(guessedAnswer?.attributeValues[attr.id]) ===
 					JSON.stringify(currentAnswer.attributeValues[attr.id]);
 			});
+
 			setAttributeResults(newResults);
+
+			// Save progress
+			const session = {
+				userId: user?.uid,
+				gameId: game.id,
+				date: new Date().toISOString().split("T")[0],
+				attempts: newAttempts,
+				attributeResults: newResults,
+				startedAt: new Date().toISOString(),
+				isComplete: false,
+			};
+			await saveGameSession(session, user?.uid);
 		}
 	};
+
+	if (loading) {
+		return (
+			<div className="flex justify-center items-center min-h-screen">
+				<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+			</div>
+		);
+	}
 
 	if (!currentAnswer || !game.attributes) return null;
 
