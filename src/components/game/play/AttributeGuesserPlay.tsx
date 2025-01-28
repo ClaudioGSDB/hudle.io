@@ -45,13 +45,16 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	useEffect(() => {
 		const loadGame = async () => {
 			try {
-				// Load game answers
 				const gameAnswers = await getGameAnswers(game.id);
 				setAnswers(gameAnswers as AttributeGameAnswer[]);
 
 				if (user) {
 					recordGameStart(user.uid, game.id).then(setPlayId);
 				}
+
+				// Always use daily answer selection
+				const dailyAnswer = await getDailyAnswer(game.id);
+				setCurrentAnswer(dailyAnswer as AttributeGameAnswer);
 
 				// Check for existing session
 				const session = await getGameSession(game.id, user?.uid);
@@ -60,32 +63,11 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 					setAttempts(session.attempts);
 					setAttributeResults(session.attributeResults);
 					setGameComplete(session.isComplete);
-
-					if (session.isComplete) {
-						const answerId = game.settings.isDailyChallenge
-							? await getDailyAnswer(game.id)
-							: gameAnswers[0];
-						setCurrentAnswer(answerId as AttributeGameAnswer);
-					}
-				} else {
-					// Create new session
-					const newSession = createNewSession(game.id, user?.uid);
-					await saveGameSession(newSession, user?.uid);
 				}
 
-				if (game.settings.isDailyChallenge) {
-					const dailyAnswer = await getDailyAnswer(game.id);
-					setCurrentAnswer(dailyAnswer as AttributeGameAnswer);
-
-					if (user) {
-						const userStats = await getDailyStats(
-							user.uid,
-							game.id
-						);
-						setStats(userStats);
-					}
-				} else {
-					setCurrentAnswer(gameAnswers[0] as AttributeGameAnswer);
+				if (user) {
+					const userStats = await getDailyStats(user.uid, game.id);
+					setStats(userStats);
 				}
 			} catch (error) {
 				console.error("Error loading game:", error);
@@ -149,7 +131,7 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 				});
 			}
 
-			if (user && game.settings.isDailyChallenge) {
+			if (user) {
 				const updatedStats = await updateDailyStats(
 					user.uid,
 					game.id,
@@ -198,7 +180,7 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 
 	return (
 		<div className="max-w-2xl mx-auto p-4">
-			{game.settings.isDailyChallenge && stats && (
+			{stats && (
 				<div className="mb-4 p-4 bg-blue-50 rounded-lg">
 					<h3 className="font-semibold">Daily Challenge Stats</h3>
 					<div className="mt-2 grid grid-cols-2 gap-4 text-sm">
@@ -312,24 +294,22 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 				<div className="mt-8 p-4 bg-green-100 rounded-lg text-center">
 					<h3 className="font-bold text-lg">Congratulations!</h3>
 					<p>You solved it in {attempts.length} guesses.</p>
-					{game.settings.isDailyChallenge && (
-						<div className="mt-4">
-							<ShareResults
-								gameTitle={game.title}
-								attempts={attempts.length}
-								maxAttempts={game.maxAttempts || 6}
-								attributeResults={attempts.map((attempt) => {
-									const results: Record<string, boolean> = {};
-									game.attributes?.forEach((attr) => {
-										results[attr.id] =
-											attempt.toLowerCase() ===
-											currentAnswer?.answer.toLowerCase();
-									});
-									return results;
-								})}
-							/>
-						</div>
-					)}
+					<div className="mt-4">
+						<ShareResults
+							gameTitle={game.title}
+							attempts={attempts.length}
+							maxAttempts={game.maxAttempts || 6}
+							attributeResults={attempts.map((attempt) => {
+								const results: Record<string, boolean> = {};
+								game.attributes?.forEach((attr) => {
+									results[attr.id] =
+										attempt.toLowerCase() ===
+										currentAnswer?.answer.toLowerCase();
+								});
+								return results;
+							})}
+						/>
+					</div>
 				</div>
 			)}
 		</div>

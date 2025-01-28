@@ -27,7 +27,6 @@ export interface GameContent {
 
 // Game settings
 export interface GameSettings {
-	isDailyChallenge: boolean;
 	allowSkip: boolean;
 	showProgress: boolean;
 	requiresLogin: boolean;

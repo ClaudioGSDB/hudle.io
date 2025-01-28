@@ -42,7 +42,6 @@ export default function GameCreatorForm() {
 		guessType: "exact",
 		contents: [],
 		settings: {
-			isDailyChallenge: false,
 			allowSkip: false,
 			showProgress: true,
 			requiresLogin: true,
@@ -224,24 +223,6 @@ export default function GameCreatorForm() {
 						<label className="flex items-center space-x-3">
 							<input
 								type="checkbox"
-								checked={gameData.settings?.isDailyChallenge}
-								onChange={(e) =>
-									setGameData((prev) => ({
-										...prev,
-										settings: {
-											...prev.settings!,
-											isDailyChallenge: e.target.checked,
-										},
-									}))
-								}
-								className="rounded border-gray-300"
-							/>
-							<span>Daily Challenge</span>
-						</label>
-
-						<label className="flex items-center space-x-3">
-							<input
-								type="checkbox"
 								checked={gameData.settings?.allowSkip}
 								onChange={(e) =>
 									setGameData((prev) => ({
@@ -310,9 +291,6 @@ export default function GameCreatorForm() {
 							<dt className="text-sm text-gray-600">Settings:</dt>
 							<dd>
 								<ul className="list-disc pl-5">
-									{gameData.settings?.isDailyChallenge && (
-										<li>Daily Challenge</li>
-									)}
 									{gameData.settings?.allowSkip && (
 										<li>Skipping Allowed</li>
 									)}
