@@ -1,17 +1,14 @@
 //src/services/dailyChallenge.ts
 import { getGameAnswers } from "./game";
 
-export function getDailySeed(gameId: string): number {
-	const today = new Date();
-	const dateString = `${today.getFullYear()}-${
-		today.getMonth() + 1
-	}-${today.getDate()}`;
-	const seed = dateString
-		.split("")
-		.reduce((acc, char) => acc + char.charCodeAt(0), 0);
-	return gameId
-		.split("")
-		.reduce((acc, char) => acc + char.charCodeAt(0), seed);
+export function getDailySeed(gameId: string, testDate?: Date): number {
+	const date = testDate || new Date();
+	const daysSinceEpoch = Math.floor(date.getTime() / (1000 * 60 * 60 * 24));
+	// Use prime numbers for better distribution
+	const prime1 = 31;
+	const prime2 = 17;
+	const hash = (daysSinceEpoch * prime1 + gameId.length * prime2) % 1000000;
+	return hash;
 }
 
 export async function getDailyAnswer(gameId: string) {
