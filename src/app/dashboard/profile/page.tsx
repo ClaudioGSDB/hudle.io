@@ -8,6 +8,7 @@ import { getCreatorGames } from "@/services/game";
 import { getUserGameHistory } from "@/services/gamesPlayed";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { getUserStats } from "@/services/userStats";
 
 interface GamePlay {
 	id: string;
@@ -29,11 +30,7 @@ export default function ProfilePage() {
 	const [games, setGames] = useState<Game[]>([]);
 	const [history, setHistory] = useState<GamePlay[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [stats, setStats] = useState({
-		totalGames: 0,
-		publishedGames: 0,
-		totalPlays: 0,
-	});
+	const [userStats, setUserStats] = useState<any>(null);
 
 	useEffect(() => {
 		const loadData = async () => {
@@ -42,16 +39,14 @@ export default function ProfilePage() {
 				// Load created games
 				const userGames = await getCreatorGames(user.uid);
 				setGames(userGames);
-				setStats({
-					totalGames: userGames.length,
-					publishedGames: userGames.filter((game) => game.isPublished)
-						.length,
-					totalPlays: 0, // Will be updated with actual plays
-				});
 
 				// Load game history
 				const plays = await getUserGameHistory(user.uid);
 				setHistory(plays as GamePlay[]);
+
+				// Load user stats
+				const stats = await getUserStats(user.uid);
+				setUserStats(stats);
 			} catch (error) {
 				console.error("Error loading data:", error);
 			} finally {
@@ -80,7 +75,7 @@ export default function ProfilePage() {
 		<ProtectedRoute>
 			<div className="min-h-screen bg-gray-50 py-8">
 				<div className="max-w-6xl mx-auto px-4">
-					{/* Profile Header */}
+					{/* Profile Header with Stats */}
 					<div className="bg-white rounded-lg shadow overflow-hidden mb-8">
 						<div className="p-6 sm:p-8 bg-blue-600 text-white">
 							<h1 className="text-3xl font-bold">
@@ -95,33 +90,146 @@ export default function ProfilePage() {
 						</div>
 
 						{/* Stats Grid */}
-						<div className="grid grid-cols-3 border-b">
+						<div className="grid grid-cols-4 border-b">
 							<div className="p-6 text-center">
 								<div className="text-2xl font-bold">
-									{stats.totalGames}
-								</div>
-								<div className="text-sm text-gray-500">
-									Total Games
-								</div>
-							</div>
-							<div className="p-6 text-center border-l border-r">
-								<div className="text-2xl font-bold">
-									{stats.publishedGames}
-								</div>
-								<div className="text-sm text-gray-500">
-									Published Games
-								</div>
-							</div>
-							<div className="p-6 text-center">
-								<div className="text-2xl font-bold">
-									{history.length}
+									{userStats?.totalGamesPlayed || 0}
 								</div>
 								<div className="text-sm text-gray-500">
 									Games Played
 								</div>
 							</div>
+							<div className="p-6 text-center border-l">
+								<div className="text-2xl font-bold">
+									{userStats?.dailyStreak || 0}
+								</div>
+								<div className="text-sm text-gray-500">
+									Current Streak
+								</div>
+							</div>
+							<div className="p-6 text-center border-l">
+								<div className="text-2xl font-bold">
+									{userStats?.achievements?.maxStreak || 0}
+								</div>
+								<div className="text-sm text-gray-500">
+									Best Streak
+								</div>
+							</div>
+							<div className="p-6 text-center border-l">
+								<div className="text-2xl font-bold">
+									{userStats?.achievements?.perfectGames || 0}
+								</div>
+								<div className="text-sm text-gray-500">
+									Perfect Games
+								</div>
+							</div>
+						</div>
+
+						{/* Achievements Section */}
+						<div className="p-6">
+							<h2 className="text-lg font-semibold mb-4">
+								Achievements
+							</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div
+									className={`p-4 rounded-lg border ${
+										userStats?.achievements?.firstWin
+											? "bg-green-50 border-green-200"
+											: "bg-gray-50 border-gray-200"
+									}`}
+								>
+									<div className="font-medium">First Win</div>
+									<div className="text-sm text-gray-600">
+										Win your first game
+									</div>
+								</div>
+								<div
+									className={`p-4 rounded-lg border ${
+										userStats?.achievements?.perfectGames
+											? "bg-green-50 border-green-200"
+											: "bg-gray-50 border-gray-200"
+									}`}
+								>
+									<div className="font-medium">
+										Perfect Game
+									</div>
+									<div className="text-sm text-gray-600">
+										Win a game in one try
+									</div>
+								</div>
+							</div>
 						</div>
 					</div>
+
+					{/* Game-specific Stats */}
+					{userStats?.gameStats &&
+						Object.keys(userStats.gameStats).length > 0 && (
+							<div className="bg-white rounded-lg shadow mb-8">
+								<div className="p-6">
+									<h2 className="text-lg font-semibold mb-4">
+										Game Statistics
+									</h2>
+									<div className="overflow-x-auto">
+										<table className="min-w-full">
+											<thead className="bg-gray-50">
+												<tr>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+														Game
+													</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+														Games Played
+													</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+														Games Won
+													</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+														Win %
+													</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+														Avg. Attempts
+													</th>
+												</tr>
+											</thead>
+											<tbody className="bg-white divide-y divide-gray-200">
+												{Object.entries(
+													userStats.gameStats
+												).map(
+													([gameId, stats]: [
+														string,
+														any
+													]) => (
+														<tr key={gameId}>
+															<td className="px-6 py-4 whitespace-nowrap">
+																{gameId}
+															</td>
+															<td className="px-6 py-4 whitespace-nowrap">
+																{stats.played}
+															</td>
+															<td className="px-6 py-4 whitespace-nowrap">
+																{stats.won}
+															</td>
+															<td className="px-6 py-4 whitespace-nowrap">
+																{(
+																	(stats.won /
+																		stats.played) *
+																	100
+																).toFixed(1)}
+																%
+															</td>
+															<td className="px-6 py-4 whitespace-nowrap">
+																{stats.avgAttempts.toFixed(
+																	1
+																)}
+															</td>
+														</tr>
+													)
+												)}
+											</tbody>
+										</table>
+									</div>
+								</div>
+							</div>
+						)}
 
 					{/* Created Games Section */}
 					<div className="bg-white rounded-lg shadow mb-8">
@@ -144,21 +252,12 @@ export default function ProfilePage() {
 											</p>
 										</div>
 										<div className="flex items-center space-x-2">
-											{game.isPublished ? (
-												<Link
-													href={`/play/${game.id}`}
-													className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-												>
-													Play
-												</Link>
-											) : (
-												<Link
-													href={`/creator/game/${game.id}/setup`}
-													className="px-3 py-1 bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200"
-												>
-													Complete Setup
-												</Link>
-											)}
+											<Link
+												href={`/play/${game.id}`}
+												className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+											>
+												Play
+											</Link>
 											<Link
 												href={`/creator/game/${game.id}/edit`}
 												className="px-3 py-1 border rounded hover:bg-gray-50"

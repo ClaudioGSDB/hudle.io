@@ -15,6 +15,7 @@ import {
 	saveGameSession,
 	createNewSession,
 } from "@/services/gameSession";
+import { updateUserStats } from "@/services/userStats";
 
 export default function AttributeGuesserPlay({ game }: { game: Game }) {
 	const { user } = useAuth();
@@ -120,25 +121,24 @@ export default function AttributeGuesserPlay({ game }: { game: Game }) {
 			};
 			await saveGameSession(session, user?.uid);
 
-			if (playId) {
-				await recordGameEnd(playId, {
-					attempts: newAttempts.length,
-					won: true,
-					timeSpent: Math.floor(
-						(Date.now() - new Date(game.createdAt).getTime()) / 1000
-					),
-					guesses: newAttempts,
-				});
-			}
-
 			if (user) {
-				const updatedStats = await updateDailyStats(
+				await updateUserStats(
 					user.uid,
 					game.id,
 					true,
-					attempts.length + 1
+					newAttempts.length
 				);
-				setStats(updatedStats);
+				if (playId) {
+					await recordGameEnd(playId, {
+						attempts: newAttempts.length,
+						won: true,
+						timeSpent: Math.floor(
+							(Date.now() - new Date(game.createdAt).getTime()) /
+								1000
+						),
+						guesses: newAttempts,
+					});
+				}
 			}
 		} else {
 			const guessedAnswer = answers.find(
