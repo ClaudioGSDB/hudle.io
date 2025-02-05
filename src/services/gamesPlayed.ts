@@ -23,7 +23,7 @@ export async function recordGameStart(
 	userId: string | null,
 	gameId: string
 ): Promise<string | null> {
-	if (!userId) return null; // Skip recording if no user
+	if (!userId) return null;
 
 	try {
 		const play = {
@@ -36,7 +36,10 @@ export async function recordGameStart(
 		const docRef = await addDoc(collection(db, PLAYS_COLLECTION), play);
 		return docRef.id;
 	} catch (error) {
-		console.error("Error recording game start:", error);
+		console.warn(
+			"Unable to record game start. This won't affect gameplay:",
+			error
+		);
 		return null;
 	}
 }
