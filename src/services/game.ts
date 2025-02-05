@@ -24,55 +24,99 @@ import {
 
 const GAMES_COLLECTION = "games";
 const ANSWERS_COLLECTION = "answers";
-const PLAYS_COLLECTION = "plays";
 
 export async function createGame(
 	creatorId: string,
 	gameData: Partial<Game>
 ): Promise<string> {
-	const gamesRef = collection(db, GAMES_COLLECTION);
-	const newGameRef = doc(gamesRef);
+	try {
+		const gamesRef = collection(db, GAMES_COLLECTION);
+		const newGameRef = doc(gamesRef);
 
-	const game: Game = {
-		id: newGameRef.id,
-		creatorId,
-		title: gameData.title || "Untitled Game",
-		description: gameData.description || "",
-		type: gameData.type || "custom",
-		guessType: gameData.guessType || "exact",
-		contents: gameData.contents || [],
-		attributes: gameData.attributes || [],
-		settings: {
-			allowSkip: gameData.settings?.allowSkip || false,
-			showProgress: gameData.settings?.showProgress || true,
-			requiresLogin: gameData.settings?.requiresLogin || false,
-			...gameData.settings,
-		},
-		isPublished: false,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-		tags: gameData.tags || [],
-	};
+		const game: Game = {
+			id: newGameRef.id,
+			creatorId,
+			title: gameData.title || "Untitled Game",
+			description: gameData.description || "",
+			type: gameData.type || "custom",
+			guessType: gameData.guessType || "exact",
+			contents: gameData.contents || [],
+			attributes: gameData.attributes || [],
+			settings: {
+				allowSkip: gameData.settings?.allowSkip || false,
+				showProgress: gameData.settings?.showProgress || true,
+				requiresLogin: gameData.settings?.requiresLogin || false,
+				...gameData.settings,
+			},
+			isPublished: false,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+			tags: gameData.tags || [],
+		};
 
-	await setDoc(newGameRef, game);
-	return game.id;
+		await setDoc(newGameRef, game);
+		return game.id;
+	} catch (error) {
+		console.error("Error creating game:", error);
+		throw error;
+	}
 }
 
 export async function updateGame(
 	gameId: string,
 	updates: Partial<Game>
 ): Promise<void> {
-	const gameRef = doc(db, GAMES_COLLECTION, gameId);
-	await updateDoc(gameRef, {
-		...updates,
-		updatedAt: new Date().toISOString(),
-	});
+	try {
+		const gameRef = doc(db, GAMES_COLLECTION, gameId);
+		await updateDoc(gameRef, {
+			...updates,
+			updatedAt: new Date().toISOString(),
+		});
+	} catch (error) {
+		console.error("Error updating game:", error);
+		throw error;
+	}
 }
 
 export async function getGame(gameId: string): Promise<Game | null> {
-	const gameRef = doc(db, GAMES_COLLECTION, gameId);
-	const gameSnap = await getDoc(gameRef);
-	return gameSnap.exists() ? (gameSnap.data() as Game) : null;
+	try {
+		const gameRef = doc(db, GAMES_COLLECTION, gameId);
+		const gameSnap = await getDoc(gameRef);
+		return gameSnap.exists() ? (gameSnap.data() as Game) : null;
+	} catch (error) {
+		console.error("Error getting game:", error);
+		return null;
+	}
+}
+
+export async function getPublicGames(limitCount: number = 20): Promise<Game[]> {
+	try {
+		const gamesRef = collection(db, GAMES_COLLECTION);
+		const q = query(
+			gamesRef,
+			where("isPublished", "==", true),
+			orderBy("createdAt", "desc"),
+			firestoreLimit(limitCount)
+		);
+
+		const querySnapshot = await getDocs(q);
+		return querySnapshot.docs.map((doc) => doc.data() as Game);
+	} catch (error) {
+		console.error("Error getting public games:", error);
+		return [];
+	}
+}
+
+export async function getCreatorGames(creatorId: string): Promise<Game[]> {
+	try {
+		const gamesRef = collection(db, GAMES_COLLECTION);
+		const q = query(gamesRef, where("creatorId", "==", creatorId));
+		const querySnapshot = await getDocs(q);
+		return querySnapshot.docs.map((doc) => doc.data() as Game);
+	} catch (error) {
+		console.error("Error getting creator games:", error);
+		return [];
+	}
 }
 
 export async function createGameAnswer(
@@ -85,113 +129,112 @@ export async function createGameAnswer(
 		| ProgressiveGameAnswer
 	>
 ): Promise<string> {
-	const answersRef = collection(
-		db,
-		GAMES_COLLECTION,
-		gameId,
-		ANSWERS_COLLECTION
-	);
-	const newAnswerRef = doc(answersRef);
+	try {
+		const answersRef = collection(
+			db,
+			GAMES_COLLECTION,
+			gameId,
+			ANSWERS_COLLECTION
+		);
+		const newAnswerRef = doc(answersRef);
 
-	const baseAnswer = {
-		id: newAnswerRef.id,
-		gameId,
-		...answerData,
-	};
+		const baseAnswer = {
+			id: newAnswerRef.id,
+			gameId,
+			...answerData,
+		};
 
-	// Create the appropriate answer type based on game type
-	let answer: GameAnswer;
-	switch (gameType) {
-		case "attribute_guesser":
-			answer = {
-				...baseAnswer,
-				answer: answerData.answer || "",
-				attributeValues:
-					(answerData as Partial<AttributeGameAnswer>)
-						.attributeValues || {},
-			} as AttributeGameAnswer;
-			break;
-		case "image_guesser":
-			answer = {
-				...baseAnswer,
-				answer: answerData.answer || "",
-				contents:
-					(answerData as Partial<ImageGameAnswer>).contents || {},
-			} as ImageGameAnswer;
-			break;
-		case "quote_guesser":
-			answer = {
-				...baseAnswer,
-				answer: answerData.answer || "",
-				contents:
-					(answerData as Partial<QuoteGameAnswer>).contents || {},
-			} as QuoteGameAnswer;
-			break;
-		case "progressive":
-			answer = {
-				...baseAnswer,
-				answer: answerData.answer || "",
-				contents:
-					(answerData as Partial<ProgressiveGameAnswer>).contents ||
-					{},
-			} as ProgressiveGameAnswer;
-			break;
-		default:
-			throw new Error(`Unsupported game type: ${gameType}`);
+		let answer: GameAnswer;
+		switch (gameType) {
+			case "attribute_guesser":
+				answer = {
+					...baseAnswer,
+					answer: answerData.answer || "",
+					attributeValues:
+						(answerData as Partial<AttributeGameAnswer>)
+							.attributeValues || {},
+				} as AttributeGameAnswer;
+				break;
+			case "image_guesser":
+				answer = {
+					...baseAnswer,
+					answer: answerData.answer || "",
+					contents:
+						(answerData as Partial<ImageGameAnswer>).contents || {},
+				} as ImageGameAnswer;
+				break;
+			case "quote_guesser":
+				answer = {
+					...baseAnswer,
+					answer: answerData.answer || "",
+					contents:
+						(answerData as Partial<QuoteGameAnswer>).contents || {},
+				} as QuoteGameAnswer;
+				break;
+			case "progressive":
+				answer = {
+					...baseAnswer,
+					answer: answerData.answer || "",
+					contents:
+						(answerData as Partial<ProgressiveGameAnswer>)
+							.contents || {},
+				} as ProgressiveGameAnswer;
+				break;
+			default:
+				throw new Error(`Unsupported game type: ${gameType}`);
+		}
+
+		await setDoc(newAnswerRef, answer);
+		return answer.id;
+	} catch (error) {
+		console.error("Error creating game answer:", error);
+		throw error;
 	}
-
-	await setDoc(newAnswerRef, answer);
-	return answer.id;
 }
 
 export async function getGameAnswers(gameId: string): Promise<GameAnswer[]> {
-	const answersRef = collection(
-		db,
-		GAMES_COLLECTION,
-		gameId,
-		ANSWERS_COLLECTION
-	);
-	const querySnapshot = await getDocs(answersRef);
-	return querySnapshot.docs.map((doc) => doc.data() as GameAnswer);
+	try {
+		const answersRef = collection(
+			db,
+			GAMES_COLLECTION,
+			gameId,
+			ANSWERS_COLLECTION
+		);
+		const querySnapshot = await getDocs(answersRef);
+		return querySnapshot.docs.map((doc) => doc.data() as GameAnswer);
+	} catch (error) {
+		console.error("Error getting game answers:", error);
+		return [];
+	}
 }
 
 export async function deleteGameAnswer(
 	gameId: string,
 	answerId: string
 ): Promise<void> {
-	const answerRef = doc(
-		db,
-		GAMES_COLLECTION,
-		gameId,
-		ANSWERS_COLLECTION,
-		answerId
-	);
-	await deleteDoc(answerRef);
-}
-
-export async function getPublicGames(limitCount: number = 10): Promise<Game[]> {
-	const gamesRef = collection(db, GAMES_COLLECTION);
-	const q = query(
-		gamesRef,
-		where("isPublished", "==", true),
-		orderBy("createdAt", "desc"),
-		firestoreLimit(limitCount)
-	);
-
-	const querySnapshot = await getDocs(q);
-	return querySnapshot.docs.map((doc) => doc.data() as Game);
-}
-
-export async function getCreatorGames(creatorId: string): Promise<Game[]> {
-	const gamesRef = collection(db, GAMES_COLLECTION);
-	const q = query(gamesRef, where("creatorId", "==", creatorId));
-	const querySnapshot = await getDocs(q);
-	return querySnapshot.docs.map((doc) => doc.data() as Game);
+	try {
+		const answerRef = doc(
+			db,
+			GAMES_COLLECTION,
+			gameId,
+			ANSWERS_COLLECTION,
+			answerId
+		);
+		await deleteDoc(answerRef);
+	} catch (error) {
+		console.error("Error deleting game answer:", error);
+		throw error;
+	}
 }
 
 export async function deleteGame(gameId: string): Promise<void> {
-	const gameRef = doc(db, GAMES_COLLECTION, gameId);
-	await deleteDoc(gameRef);
+	try {
+		const gameRef = doc(db, GAMES_COLLECTION, gameId);
+		await deleteDoc(gameRef);
+	} catch (error) {
+		console.error("Error deleting game:", error);
+		throw error;
+	}
 }
 
 export async function updateGameAnswer(
@@ -199,12 +242,17 @@ export async function updateGameAnswer(
 	answerId: string,
 	updates: Partial<GameAnswer>
 ): Promise<void> {
-	const answerRef = doc(
-		db,
-		GAMES_COLLECTION,
-		gameId,
-		ANSWERS_COLLECTION,
-		answerId
-	);
-	await updateDoc(answerRef, updates);
+	try {
+		const answerRef = doc(
+			db,
+			GAMES_COLLECTION,
+			gameId,
+			ANSWERS_COLLECTION,
+			answerId
+		);
+		await updateDoc(answerRef, updates);
+	} catch (error) {
+		console.error("Error updating game answer:", error);
+		throw error;
+	}
 }

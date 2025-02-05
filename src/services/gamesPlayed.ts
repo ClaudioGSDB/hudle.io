@@ -1,4 +1,5 @@
 //src/services/gamesPlayed.ts
+import { db } from "@/lib/firebase";
 import {
 	collection,
 	addDoc,
@@ -6,95 +7,136 @@ import {
 	query,
 	where,
 	updateDoc,
-	getDoc,
 	doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-
-const PLAYS_COLLECTION = "plays";
 
 interface PlayStats {
 	attempts: number;
 	won: boolean;
 	timeSpent: number;
 	guesses: string[];
-	completedAt?: string;
 }
 
-export async function recordGameStart(userId: string, gameId: string) {
-	const play = {
-		userId,
-		gameId,
-		startedAt: new Date().toISOString(),
-		status: "in_progress",
-	};
+const PLAYS_COLLECTION = "plays";
 
-	const docRef = await addDoc(collection(db, PLAYS_COLLECTION), play);
-	return docRef.id;
+export async function recordGameStart(
+	userId: string | null,
+	gameId: string
+): Promise<string | null> {
+	if (!userId) return null; // Skip recording if no user
+
+	try {
+		const play = {
+			userId,
+			gameId,
+			startedAt: new Date().toISOString(),
+			status: "in_progress",
+		};
+
+		const docRef = await addDoc(collection(db, PLAYS_COLLECTION), play);
+		return docRef.id;
+	} catch (error) {
+		console.error("Error recording game start:", error);
+		return null;
+	}
 }
 
-export async function recordGameEnd(playId: string, stats: PlayStats) {
-	const playRef = doc(db, PLAYS_COLLECTION, playId);
-	await updateDoc(playRef, {
-		...stats,
-		status: "completed",
-		completedAt: new Date().toISOString(),
-	});
+export async function recordGameEnd(
+	playId: string | null,
+	stats: PlayStats
+): Promise<void> {
+	if (!playId) return; // Skip if no playId (unauthenticated user)
+
+	try {
+		const playRef = doc(db, PLAYS_COLLECTION, playId);
+		await updateDoc(playRef, {
+			...stats,
+			status: "completed",
+			completedAt: new Date().toISOString(),
+		});
+	} catch (error) {
+		console.error("Error recording game end:", error);
+	}
 }
 
 export async function getGameStats(gameId: string) {
-	const q = query(
-		collection(db, PLAYS_COLLECTION),
-		where("gameId", "==", gameId)
-	);
-	const querySnapshot = await getDocs(q);
+	try {
+		const q = query(
+			collection(db, PLAYS_COLLECTION),
+			where("gameId", "==", gameId)
+		);
+		const querySnapshot = await getDocs(q);
 
-	const stats = {
-		totalPlays: 0,
-		completedPlays: 0,
-		averageAttempts: 0,
-		winRate: 0,
-		guessDistribution: {} as Record<number, number>,
-		averageTime: 0,
-	};
+		const stats = {
+			totalPlays: 0,
+			completedPlays: 0,
+			winRate: 0,
+			guessDistribution: {} as Record<number, number>,
+			averageTime: 0,
+		};
 
-	let totalAttempts = 0;
-	let totalTime = 0;
-	let totalWins = 0;
+		let totalAttempts = 0;
+		let totalTime = 0;
+		let wins = 0;
 
-	querySnapshot.forEach((doc) => {
-		const data = doc.data();
-		stats.totalPlays++;
+		querySnapshot.forEach((doc) => {
+			const data = doc.data();
+			stats.totalPlays++;
 
-		if (data.status === "completed") {
-			stats.completedPlays++;
-			totalAttempts += data.attempts || 0;
-			totalTime += data.timeSpent || 0;
+			if (data.status === "completed") {
+				stats.completedPlays++;
 
-			if (data.won) {
-				totalWins++;
-				// Update guess distribution
-				const attemptCount =
-					stats.guessDistribution[data.attempts] || 0;
-				stats.guessDistribution[data.attempts] = attemptCount + 1;
+				if (data.won) {
+					wins++;
+					// Update guess distribution
+					const attemptCount =
+						stats.guessDistribution[data.attempts] || 0;
+					stats.guessDistribution[data.attempts] = attemptCount + 1;
+				}
+
+				if (data.timeSpent) {
+					totalTime += data.timeSpent;
+				}
+
+				if (data.attempts) {
+					totalAttempts += data.attempts;
+				}
 			}
+		});
+
+		if (stats.completedPlays > 0) {
+			stats.winRate = (wins / stats.completedPlays) * 100;
+			stats.averageTime = totalTime / stats.completedPlays;
 		}
-	});
 
-	if (stats.completedPlays > 0) {
-		stats.averageAttempts = totalAttempts / stats.completedPlays;
-		stats.winRate = (totalWins / stats.completedPlays) * 100;
-		stats.averageTime = totalTime / stats.completedPlays;
+		return stats;
+	} catch (error) {
+		console.error("Error getting game stats:", error);
+		return {
+			totalPlays: 0,
+			completedPlays: 0,
+			winRate: 0,
+			guessDistribution: {},
+			averageTime: 0,
+		};
 	}
-
-	return stats;
 }
 
-export async function getUserGameHistory(userId: string) {
-	const q = query(
-		collection(db, PLAYS_COLLECTION),
-		where("userId", "==", userId)
-	);
-	const querySnapshot = await getDocs(q);
-	return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+export async function getUserGameHistory(userId: string | null) {
+	if (!userId) return []; // Return empty array for unauthenticated users
+
+	try {
+		const q = query(
+			collection(db, PLAYS_COLLECTION),
+			where("userId", "==", userId)
+		);
+		const querySnapshot = await getDocs(q);
+		return querySnapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data(),
+		}));
+	} catch (error) {
+		console.error("Error getting user game history:", error);
+		return [];
+	}
 }
