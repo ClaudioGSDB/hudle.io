@@ -11,8 +11,7 @@ const GAME_TYPES = [
 	{
 		id: "attribute_guesser",
 		name: "Attribute Guesser",
-		description:
-			"Players guess based on matching attributes (like Loldle Champion)",
+		description: "Players guess based on matching attributes (like Loldle Champion)",
 	},
 	{
 		id: "image_guesser",
@@ -89,9 +88,7 @@ export default function GameCreatorForm() {
 			const gameId = await createGame(user.uid, gameData);
 			router.push(`/creator/game/${gameId}/setup`);
 		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : "Failed to create game"
-			);
+			setError(err instanceof Error ? err.message : "Failed to create game");
 			setLoading(false);
 		}
 	};
@@ -105,9 +102,7 @@ export default function GameCreatorForm() {
 						<div
 							key={index}
 							className={`h-2 flex-1 mx-1 rounded ${
-								index <= currentStep
-									? "bg-blue-500"
-									: "bg-gray-200"
+								index <= currentStep ? "bg-blue-500" : "bg-gray-200"
 							}`}
 						/>
 					))}
@@ -135,16 +130,25 @@ export default function GameCreatorForm() {
 
 			{currentStep === 0 && (
 				<div className="grid grid-cols-2 gap-4">
-					{GAME_TYPES.map((type) => (
+					{GAME_TYPES.map((type, index) => (
 						<button
 							key={type.id}
 							onClick={() => handleTypeSelect(type.id)}
-							className="p-6 border rounded-lg hover:border-blue-500 hover:bg-blue-50"
+							className={`p-6 border rounded-lg ${
+								index !== 0
+									? "bg-gray-100 text-gray-400 cursor-not-allowed"
+									: "hover:border-blue-500 hover:bg-blue-50"
+							}`}
+							disabled={index !== 0}
 						>
-							<h3 className="text-lg font-semibold mb-2">
-								{type.name}
-							</h3>
-							<p className="text-gray-600">{type.description}</p>
+							<h3 className="text-lg font-semibold mb-2">{type.name}</h3>
+							<p
+								className={`${
+									index !== 0 ? "text-gray-400" : "text-gray-600"
+								}`}
+							>
+								{type.description}
+							</p>
 						</button>
 					))}
 				</div>
@@ -273,19 +277,13 @@ export default function GameCreatorForm() {
 						<dl className="space-y-2">
 							<dt className="text-sm text-gray-600">Type:</dt>
 							<dd className="mb-2">
-								{
-									GAME_TYPES.find(
-										(t) => t.id === gameData.type
-									)?.name
-								}
+								{GAME_TYPES.find((t) => t.id === gameData.type)?.name}
 							</dd>
 
 							<dt className="text-sm text-gray-600">Title:</dt>
 							<dd className="mb-2">{gameData.title}</dd>
 
-							<dt className="text-sm text-gray-600">
-								Description:
-							</dt>
+							<dt className="text-sm text-gray-600">Description:</dt>
 							<dd className="mb-2">{gameData.description}</dd>
 
 							<dt className="text-sm text-gray-600">Settings:</dt>
@@ -303,9 +301,7 @@ export default function GameCreatorForm() {
 					</div>
 
 					{error && (
-						<div className="bg-red-50 text-red-600 p-4 rounded">
-							{error}
-						</div>
+						<div className="bg-red-50 text-red-600 p-4 rounded">{error}</div>
 					)}
 
 					<button
